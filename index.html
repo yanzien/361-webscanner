@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>361网页病毒扫描器</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 统一的 Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#10b981',
+                        danger: '#ef4444',
+                        dark: '#1e293b',
+                        light: '#f8fafc'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-fast': 'bounce 1s infinite',
+                        'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
+                        'glitch': 'glitch 1s linear infinite',
+                        'scan': 'scan 2s ease-in-out infinite',
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-in': 'slideIn 0.5s ease-in-out',
+                    },
+                    keyframes: {
+                        shake: {
+                            '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+                            '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+                            '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+                            '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
+                        },
+                        glitch: {
+                            '0%': { transform: 'translate(0)' },
+                            '20%': { transform: 'translate(-2px, 2px)' },
+                            '40%': { transform: 'translate(-2px, -2px)' },
+                            '60%': { transform: 'translate(2px, 2px)' },
+                            '80%': { transform: 'translate(2px, -2px)' },
+                            '100%': { transform: 'translate(0)' }
+                        },
+                        scan: {
+                            '0%': { backgroundPosition: '0 -100%' },
+                            '50%': { backgroundPosition: '0 200%' },
+                            '100%': { backgroundPosition: '0 -100%' }
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        },
+                        slideIn: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .text-shadow-lg {
+                text-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            }
+            .bg-scan {
+                background: linear-gradient(to bottom, transparent 0%, rgba(239, 68, 68, 0.1) 50%, transparent 100%);
+                background-size: 100% 200%;
+                animation: scan 2s ease-in-out infinite;
+            }
+            .noise {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJhIiB4PSIwIiB5PSIwIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjc1IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PGZlQ29sb3JNYXRyaXggdHlwZT0ic2F0dXJhdGUiIHZhbHVlcz0iMCIvPjwvZmlsdGVyPjxwYXRoIGQ9Ik0wIDBoMzAwdjMwMEgweiIgZmlsdGVyPSJ1cmwoI2EpIiBvcGFjaXR5PSIuMDUiLz48L3N2Zz4=');
+                opacity: 0;
+                pointer-events: none;
+                z-index: 50;
+                transition: opacity 0.5s ease-in-out;
+            }
+            .noise.active {
+                opacity: 1;
+            }
+            .virus-particle {
+                position: absolute;
+                width: 4px;
+                height: 4px;
+                background-color: #ef4444;
+                border-radius: 50%;
+                opacity: 0;
+            }
+            .cursor-trail {
+                position: fixed;
+                width: 10px;
+                height: 10px;
+                background-color: rgba(239, 68, 68, 0.5);
+                border-radius: 50%;
+                pointer-events: none;
+                z-index: 100;
+                transform: translate(-50%, -50%);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <!-- 噪音效果层 -->
+    <div id="noise" class="noise"></div>
+    
+    <!-- 主容器 -->
+    <div id="app" class="max-w-4xl mx-auto px-4 py-8 transition-all duration-500">
+        <!-- 头部 -->
+        <header class="text-center mb-8 animate-fade-in">
+            <div class="flex justify-center items-center mb-4">
+                <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center shadow-lg">
+                    <i class="fa fa-shield text-white text-3xl"></i>
+                </div>
+            </div>
+            <h1 class="text-4xl font-bold text-dark text-shadow">361网页病毒扫描器</h1>
+            <p class="text-gray-600 mt-2">专业的在线网页安全检测工具</p>
+        </header>
+
+        <!-- 扫描器主体 -->
+        <div id="scanner" class="bg-white rounded-xl shadow-xl p-6 mb-8 animate-slide-in">
+            <div class="mb-6">
+                <label for="url-input" class="block text-sm font-medium text-gray-700 mb-2">输入要扫描的网页链接</label>
+                <div class="flex">
+                    <input 
+                        type="text" 
+                        id="url-input" 
+                        class="flex-1 block w-full px-4 py-3 border border-gray-300 rounded-l-lg focus:ring-primary focus:border-primary transition-all" 
+                        placeholder="https://example.com"
+                    >
+                    <button 
+                        id="scan-btn" 
+                        class="bg-primary hover:bg-blue-600 text-white font-medium px-6 py-3 rounded-r-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                    >
+                        开始扫描
+                    </button>
+                </div>
+            </div>
+
+            <div id="scan-info" class="hidden">
+                <!-- 扫描控制栏 -->
+                <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
+                    <div class="flex items-center">
+                        <div class="w-8 h-8 bg-primary rounded-full flex items-center justify-center mr-3 animate-pulse">
+                            <i class="fa fa-search text-white"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-medium text-gray-900">正在扫描</h3>
+                            <p id="scanning-url" class="text-xs text-gray-500 truncate max-w-xs"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span id="scan-status" class="text-sm font-medium text-primary">扫描中...</span>
+                        <button id="cancel-scan-btn" class="text-xs text-gray-500 hover:text-gray-700 flex items-center">
+                            <i class="fa fa-times mr-1"></i> 取消
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 进度条 -->
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-6">
+                    <div id="progress-bar" class="bg-primary h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+
+                <!-- 扫描详情网格 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- 左侧：扫描状态 -->
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                            <i class="fa fa-tasks mr-2 text-primary"></i> 扫描进度
+                        </h4>
+                        <div id="scan-details" class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">检查恶意脚本</span>
+                                <span id="malware-status" class="text-sm font-medium text-gray-500 flex items-center">
+                                    <i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">检查钓鱼链接</span>
+                                <span id="phishing-status" class="text-sm font-medium text-gray-500 flex items-center">
+                                    <i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">检查病毒特征</span>
+                                <span id="virus-status" class="text-sm font-medium text-gray-500 flex items-center">
+                                    <i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">检查异常行为</span>
+                                <span id="behavior-status" class="text-sm font-medium text-gray-500 flex items-center">
+                                    <i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-600">检查数据泄露</span>
+                                <span id="leak-status" class="text-sm font-medium text-gray-500 flex items-center">
+                                    <i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 右侧：实时统计 -->
+                    <div>
+                        <h4 class="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                            <i class="fa fa-bar-chart mr-2 text-primary"></i> 实时统计
+                        </h4>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-500 mb-1">已扫描文件</p>
+                                <p id="files-scanned" class="text-lg font-bold text-gray-800">0</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-500 mb-1">检测到威胁</p>
+                                <p id="threats-detected" class="text-lg font-bold text-danger">0</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-500 mb-1">扫描速度</p>
+                                <p id="scan-speed" class="text-lg font-bold text-green-600">0 KB/s</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-500 mb-1">网络请求</p>
+                                <p id="network-requests" class="text-lg font-bold text-blue-600">0</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 网络活动图表 -->
+                        <div class="mt-4 bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-500 mb-2">网络活动</p>
+                            <div id="network-chart" class="h-24 w-full bg-white rounded border border-gray-200 relative overflow-hidden">
+                                <!-- 动态生成的网络活动条 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 扫描日志 -->
+                <div class="bg-gray-900 rounded-lg p-4 text-xs text-gray-300 h-48 overflow-y-auto font-mono">
+                    <div id="scan-log" class="space-y-1">
+                        <div class="text-green-400">[+] 初始化扫描引擎...</div>
+                        <div class="text-blue-400">[*] 正在连接到扫描服务器...</div>
+                        <div class="text-green-400">[+] 连接成功，开始扫描目标URL</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结果区域 -->
+        <div id="results" class="hidden">
+            <div id="safe-result" class="hidden bg-green-50 border border-green-200 rounded-xl p-6 mb-8 animate-fade-in">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <i class="fa fa-check text-green-500 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-green-800">扫描完成，未发现威胁</h3>
+                        <p class="text-sm text-green-600 mt-1">该网页安全，可以放心访问。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="danger-result" class="hidden bg-red-50 border border-red-200 rounded-xl p-6 mb-8 animate-fade-in">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                            <i class="fa fa-exclamation-triangle text-red-500 text-xl"></i>
+                        </div>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="text-lg font-medium text-red-800">发现潜在威胁</h3>
+                        <div id="threat-list" class="mt-2 space-y-2">
+                            <!-- 威胁列表将通过JS动态添加 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 病毒警告弹窗 -->
+        <div id="virus-warning" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+            <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm"></div>
+            <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 relative z-10 animate-bounce-fast">
+                <div class="flex items-center justify-center mb-4">
+                    <div class="w-16 h-16 bg-danger rounded-full flex items-center justify-center">
+                        <i class="fa fa-exclamation-triangle text-white text-3xl"></i>
+                    </div>
+                </div>
+                <h2 class="text-2xl font-bold text-center text-danger mb-2">警告：掉入陷阱</h2>
+                <p class="text-center text-gray-700 mb-4">检测到未知病毒，正在努力维持系统稳定...</p>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                    <div id="maintain-progress" class="bg-danger h-2.5 rounded-full transition-all duration-300" style="width: 100%"></div>
+                </div>
+                <p id="maintain-status" class="text-center text-gray-600">维持中... 98%</p>
+            </div>
+        </div>
+
+        <!-- 控制面板 -->
+        <div class="bg-white rounded-xl shadow-lg p-6 animate-fade-in">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">扫描器信息</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">扫描统计</h3>
+                    <div class="flex justify-between items-center">
+                        <span class="text-2xl font-bold text-primary">1,245,789</span>
+                        <span class="text-sm text-gray-500">已扫描网页</span>
+                    </div>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">威胁检测</h3>
+                    <div class="flex justify-between items-center">
+                        <span class="text-2xl font-bold text-danger">34,567</span>
+                        <span class="text-sm text-gray-500">已发现威胁</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 病毒感染页面 -->
+    <div id="infected-screen" class="fixed inset-0 bg-black text-white flex flex-col items-center justify-center z-50 hidden">
+        <!-- 背景效果 -->
+        <div class="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black"></div>
+        
+        <!-- 网格线效果 -->
+        <div class="absolute inset-0 bg-[linear-gradient(rgba(255,0,0,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(255,0,0,0.1)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
+        
+        <!-- 警告标志 -->
+        <div class="absolute top-8 left-8 flex items-center">
+            <div class="w-10 h-10 bg-danger rounded-full flex items-center justify-center mr-3 animate-pulse-fast">
+                <i class="fa fa-exclamation-triangle text-white text-xl"></i>
+            </div>
+            <span class="text-danger font-bold text-lg">安全警报</span>
+        </div>
+        
+        <!-- 系统状态 -->
+        <div class="absolute top-8 right-8 text-right">
+            <div class="text-sm text-gray-400">系统状态</div>
+            <div class="text-danger font-bold">已被入侵</div>
+        </div>
+        
+        <!-- 主内容 -->
+        <div class="text-center max-w-2xl px-4 relative z-10">
+            <!-- 标题 -->
+            <div class="mb-8">
+                <h1 class="text-5xl md:text-6xl font-bold text-danger mb-4 animate-glitch">系统已被感染</h1>
+                <div class="flex items-center justify-center">
+                    <div class="h-1 w-16 bg-danger mr-4"></div>
+                    <p class="text-xl text-gray-300">YOUR SYSTEM HAS BEEN COMPROMISED</p>
+                    <div class="h-1 w-16 bg-danger ml-4"></div>
+                </div>
+            </div>
+            
+            <!-- 警告信息 -->
+            <div class="bg-gray-800 bg-opacity-80 backdrop-blur-sm rounded-lg p-8 mb-8 border border-danger shadow-lg shadow-danger/20">
+                <div class="flex items-center justify-center mb-6">
+                    <div class="w-20 h-20 bg-danger rounded-full flex items-center justify-center mr-4 animate-pulse-fast">
+                        <i class="fa fa-lock text-white text-4xl"></i>
+                    </div>
+                    <div class="text-left">
+                        <p class="text-lg mb-1">检测到病毒的反馈内容：</p>
+                        <p class="text-lg mb-1">你的电脑已被我控制</p>
+                        <p class="text-sm text-gray-400">所有数据已被加密</p>
+                    </div>
+                </div>
+                
+                <div class="space-y-4 mb-6">
+                    <p class="text-lg">请发消息给该邮箱缴费：<span class="text-danger font-bold text-xl">bd17@db.com</span></p>
+                    <p class="text-gray-300">否则你的键鼠将于3分钟后开始出现问题，并开始逐渐增加问题</p>
+                    <div class="flex items-center justify-center space-x-2 text-sm text-gray-400">
+                        <i class="fa fa-info-circle"></i>
+                        <span>付款后将收到解密工具和系统恢复指南</span>
+                    </div>
+                </div>
+                
+                <div class="flex justify-center items-center mt-8">
+                    <div class="w-16 h-16 bg-danger rounded-full flex items-center justify-center mr-4 animate-pulse-fast">
+                        <i class="fa fa-clock-o text-white text-3xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-400">剩余时间</p>
+                        <p id="countdown" class="text-4xl font-bold">03:00</p>
+                    </div>
+                </div>
+                
+                <!-- 系统信息 -->
+                <div class="mt-8 pt-6 border-t border-gray-700 grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-400">感染时间</p>
+                        <p id="infection-time" class="font-mono">2024-01-01 00:00:00</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400">感染类型</p>
+                        <p class="font-mono">Ransom.361.Prank</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400">受影响文件</p>
+                        <p id="affected-files" class="font-mono">1,247</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400">威胁等级</p>
+                        <p class="text-danger font-bold">极高</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 justify-center">
+                <button id="panic-btn" class="bg-danger hover:bg-red-600 text-white font-bold py-4 px-8 rounded-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger text-lg">
+                    <i class="fa fa-shield mr-2"></i> 立即处理
+                </button>
+                <button id="contact-btn" class="bg-transparent border border-gray-600 hover:border-gray-400 text-white font-bold py-4 px-8 rounded-lg transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 text-lg">
+                    <i class="fa fa-envelope mr-2"></i> 联系攻击者
+                </button>
+            </div>
+            
+            <!-- 底部信息 -->
+            <div class="mt-8 text-xs text-gray-500">
+                <p>此病毒使用高级加密算法，请勿尝试自行删除或格式化硬盘</p>
+            </div>
+        </div>
+        
+        <!-- 动态病毒粒子 -->
+        <div id="virus-particles-container" class="absolute inset-0 pointer-events-none"></div>
+        
+        <!-- 终端日志 -->
+        <div class="absolute bottom-4 left-4 right-4 h-32 bg-black bg-opacity-50 backdrop-blur-sm rounded border border-gray-800 p-3 text-xs font-mono text-green-500 overflow-y-auto hidden md:block">
+            <div id="terminal-log">
+                <div>[*] 系统权限已获取</div>
+                <div>[*] 正在提取用户数据...</div>
+                <div>[*] 发现重要文件，正在加密...</div>
+                <div>[*] 建立持久化后门...</div>
+                <div>[*] 清除入侵痕迹...</div>
+                <div>[!] 警告：检测到安全软件，正在禁用...</div>
+                <div>[+] 安全软件已禁用</div>
+                <div>[*] 勒索程序已激活</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let countdownInterval;
+        let countdownTime = 180; // 3分钟
+        let scanInterval;
+        let maintainInterval;
+        let cursorTrailInterval;
+        let progress = 0;
+        let maintainProgress = 100;
+        let infected = false;
+        
+        // DOM元素
+        const urlInput = document.getElementById('url-input');
+        const scanBtn = document.getElementById('scan-btn');
+        const cancelScanBtn = document.getElementById('cancel-scan-btn');
+        const scanInfo = document.getElementById('scan-info');
+        const progressBar = document.getElementById('progress-bar');
+        const scanStatus = document.getElementById('scan-status');
+        const scanningUrl = document.getElementById('scanning-url');
+        const malwareStatus = document.getElementById('malware-status');
+        const phishingStatus = document.getElementById('phishing-status');
+        const virusStatus = document.getElementById('virus-status');
+        const behaviorStatus = document.getElementById('behavior-status');
+        const leakStatus = document.getElementById('leak-status');
+        const filesScanned = document.getElementById('files-scanned');
+        const threatsDetected = document.getElementById('threats-detected');
+        const scanSpeed = document.getElementById('scan-speed');
+        const networkRequests = document.getElementById('network-requests');
+        const networkChart = document.getElementById('network-chart');
+        const scanLog = document.getElementById('scan-log');
+        const results = document.getElementById('results');
+        const safeResult = document.getElementById('safe-result');
+        const dangerResult = document.getElementById('danger-result');
+        const threatList = document.getElementById('threat-list');
+        const virusWarning = document.getElementById('virus-warning');
+        const maintainProgressBar = document.getElementById('maintain-progress');
+        const maintainStatus = document.getElementById('maintain-status');
+        const infectedScreen = document.getElementById('infected-screen');
+        const countdown = document.getElementById('countdown');
+        const panicBtn = document.getElementById('panic-btn');
+        const contactBtn = document.getElementById('contact-btn');
+        const infectionTime = document.getElementById('infection-time');
+        const affectedFiles = document.getElementById('affected-files');
+        const terminalLog = document.getElementById('terminal-log');
+        const virusParticlesContainer = document.getElementById('virus-particles-container');
+        const noise = document.getElementById('noise');
+        const app = document.getElementById('app');
+        
+        // 模拟病毒威胁数据
+        const threats = [
+            { name: 'Trojan.361.Generic', type: '木马', severity: '高' },
+            { name: 'JS.361.Prank', type: '脚本', severity: '中' }
+        ];
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 设置默认URL
+            urlInput.value = 'https://' + window.location.hostname;
+            
+            // 添加扫描按钮点击事件
+            scanBtn.addEventListener('click', startScan);
+            
+            // 添加取消扫描按钮点击事件
+            cancelScanBtn.addEventListener('click', () => {
+                if (confirm('确定要取消扫描吗？')) {
+                    clearInterval(scanInterval);
+                    scanInfo.classList.add('hidden');
+                    results.classList.add('hidden');
+                    // 重置状态
+                    progress = 0;
+                    progressBar.style.width = '0%';
+                }
+            });
+            
+            // 添加回车键扫描
+            urlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    startScan();
+                }
+            });
+            
+            // 添加立即处理按钮点击事件
+            panicBtn.addEventListener('click', () => {
+                // 模拟处理过程
+                showProcessingDialog();
+            });
+            
+            // 添加联系攻击者按钮点击事件
+            contactBtn.addEventListener('click', () => {
+                // 模拟联系攻击者
+                alert('正在打开邮件客户端...\n收件人: bd17@db.com\n主题: 关于系统感染赎金支付');
+            });
+            
+            // 添加鼠标移动事件（用于病毒效果）
+            document.addEventListener('mousemove', (e) => {
+                if (infected) {
+                    createCursorTrail(e.clientX, e.clientY);
+                }
+            });
+        });
+        
+        // 显示处理中对话框
+        function showProcessingDialog() {
+            // 创建模态框
+            const dialog = document.createElement('div');
+            dialog.className = 'fixed inset-0 flex items-center justify-center z-50';
+            dialog.innerHTML = `
+                <div class="absolute inset-0 bg-black bg-opacity-70 backdrop-blur-sm"></div>
+                <div class="bg-gray-800 rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 relative z-10 text-white">
+                    <div class="text-center">
+                        <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                            <i class="fa fa-spinner fa-spin text-white text-3xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold mb-2">系统正在处理中</h3>
+                        <p class="text-gray-300 mb-4">正在尝试清除病毒，请稍候...</p>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5 mb-4">
+                            <div id="processing-progress" class="bg-primary h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="processing-status" class="text-sm text-gray-400">初始化反病毒引擎...</p>
+                        <button id="cancel-processing" class="mt-6 text-sm text-gray-400 hover:text-white">取消</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(dialog);
+            
+            // 模拟处理进度
+            let processingProgress = 0;
+            const progressBar = dialog.querySelector('#processing-progress');
+            const statusText = dialog.querySelector('#processing-status');
+            const cancelBtn = dialog.querySelector('#cancel-processing');
+            
+            const processingSteps = [
+                '初始化反病毒引擎...',
+                '扫描系统文件...',
+                '检测到恶意程序，正在隔离...',
+                '尝试清除病毒...',
+                '发现勒索软件，正在分析加密算法...',
+                '警告：无法解密文件，需要支付赎金...',
+                '处理失败！建议联系技术支持。'
+            ];
+            
+            const processingInterval = setInterval(() => {
+                processingProgress += 2;
+                progressBar.style.width = `${processingProgress}%`;
+                
+                // 更新状态文本
+                const stepIndex = Math.min(Math.floor(processingProgress / 15), processingSteps.length - 1);
+                statusText.textContent = processingSteps[stepIndex];
+                
+                // 添加随机波动效果
+                if (Math.random() > 0.8) {
+                    dialog.querySelector('.bg-gray-800').classList.add('animate-shake');
+                    setTimeout(() => {
+                        dialog.querySelector('.bg-gray-800').classList.remove('animate-shake');
+                    }, 200);
+                }
+                
+                if (processingProgress >= 100) {
+                    clearInterval(processingInterval);
+                    
+                    // 显示失败消息
+                    setTimeout(() => {
+                        statusText.textContent = '处理失败！建议联系技术支持。';
+                        statusText.className = 'text-sm text-danger';
+                        
+                        // 更改按钮文本
+                        cancelBtn.textContent = '关闭';
+                    }, 1000);
+                }
+            }, 300);
+            
+            // 添加取消按钮点击事件
+            cancelBtn.addEventListener('click', () => {
+                clearInterval(processingInterval);
+                document.body.removeChild(dialog);
+            });
+        }
+        
+        // 开始扫描
+        function startScan() {
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                alert('请输入要扫描的网页链接');
+                return;
+            }
+            
+            // 验证URL格式
+            let urlPattern = /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/;
+            if (!urlPattern.test(url)) {
+                // 添加红色边框和错误提示
+                urlInput.classList.add('border-danger');
+                urlInput.classList.add('focus:ring-danger');
+                urlInput.classList.add('focus:border-danger');
+                
+                // 如果没有错误提示，则添加
+                if (!document.getElementById('url-error')) {
+                    const errorMsg = document.createElement('p');
+                    errorMsg.id = 'url-error';
+                    errorMsg.className = 'text-danger text-xs mt-1';
+                    errorMsg.textContent = '请输入有效的URL地址（例如：https://example.com）';
+                    urlInput.parentElement.parentElement.appendChild(errorMsg);
+                }
+                
+                // 2秒后移除错误样式
+                setTimeout(() => {
+                    urlInput.classList.remove('border-danger');
+                    urlInput.classList.remove('focus:ring-danger');
+                    urlInput.classList.remove('focus:border-danger');
+                }, 2000);
+                
+                return;
+            }
+            
+            // 如果之前有错误提示，移除它
+            const errorMsg = document.getElementById('url-error');
+            if (errorMsg) {
+                errorMsg.remove();
+            }
+            
+            // 确保URL有协议前缀
+            let formattedUrl = url;
+            if (!/^https?:\/\//i.test(url)) {
+                formattedUrl = 'https://' + url;
+                urlInput.value = formattedUrl;
+            }
+            
+            // 重置状态
+            progress = 0;
+            let filesCount = 0;
+            let threatsCount = 0;
+            let requestsCount = 0;
+            let speedValue = 0;
+            
+            // 重置UI
+            scanStatus.textContent = '扫描中...';
+            scanStatus.className = 'text-sm font-medium text-primary';
+            malwareStatus.innerHTML = '<i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...';
+            malwareStatus.className = 'text-sm font-medium text-gray-500 flex items-center';
+            phishingStatus.innerHTML = '<i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...';
+            phishingStatus.className = 'text-sm font-medium text-gray-500 flex items-center';
+            virusStatus.innerHTML = '<i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...';
+            virusStatus.className = 'text-sm font-medium text-gray-500 flex items-center';
+            behaviorStatus.innerHTML = '<i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...';
+            behaviorStatus.className = 'text-sm font-medium text-gray-500 flex items-center';
+            leakStatus.innerHTML = '<i class="fa fa-circle-o-notch fa-spin mr-1 text-xs"></i> 扫描中...';
+            leakStatus.className = 'text-sm font-medium text-gray-500 flex items-center';
+            
+            filesScanned.textContent = '0';
+            threatsDetected.textContent = '0';
+            scanSpeed.textContent = '0 KB/s';
+            networkRequests.textContent = '0';
+            
+            // 清空日志
+            scanLog.innerHTML = `
+                <div class="text-green-400">[+] 初始化扫描引擎...</div>
+                <div class="text-blue-400">[*] 正在连接到扫描服务器...</div>
+                <div class="text-green-400">[+] 连接成功，开始扫描目标URL</div>
+                <div class="text-blue-400">[*] 正在分析 ${formattedUrl}</div>
+            `;
+            
+            // 清空网络图表
+            networkChart.innerHTML = '';
+            
+            // 显示扫描信息
+            scanInfo.classList.remove('hidden');
+            results.classList.add('hidden');
+            scanningUrl.textContent = formattedUrl;
+            
+            // 开始扫描进度
+            scanInterval = setInterval(() => {
+                progress += 2;
+                progressBar.style.width = `${progress}%`;
+                
+                // 更新统计数据
+                filesCount += Math.floor(Math.random() * 15) + 5;
+                requestsCount += Math.floor(Math.random() * 3) + 1;
+                speedValue = Math.floor(Math.random() * 500) + 1000;
+                
+                filesScanned.textContent = filesCount.toLocaleString();
+                networkRequests.textContent = requestsCount.toLocaleString();
+                scanSpeed.textContent = `${speedValue.toLocaleString()} KB/s`;
+                
+                // 随机添加威胁 - 增加随机性
+                const threatChance = 0.03 + (progress / 1000); // 随着进度增加发现威胁的概率
+                
+                if (threatsCount === 0 && Math.random() < threatChance) {
+                    threatsCount = 1;
+                    threatsDetected.textContent = threatsCount;
+                    
+                    // 随机选择威胁类型和发现位置
+                    const threatTypes = [
+                        '可疑文件',
+                        '恶意脚本',
+                        '钓鱼链接',
+                        '未知程序',
+                        '异常网络连接'
+                    ];
+                    const threatFiles = [
+                        'suspicious.js',
+                        'admin_panel.php',
+                        'config.json',
+                        'analytics.js',
+                        'loader.exe',
+                        'update.exe',
+                        'system.dll'
+                    ];
+                    
+                    const randomType = threatTypes[Math.floor(Math.random() * threatTypes.length)];
+                    const randomFile = threatFiles[Math.floor(Math.random() * threatFiles.length)];
+                    
+                    addLogEntry(`<div class="text-red-400">[!] 警告：检测到${randomType} <span class="text-yellow-300">${randomFile}</span></div>`);
+                    
+                    // 随机触发不同的扫描状态变化
+                    const statusChanges = [
+                        () => {
+                            if (malwareStatus.innerHTML.includes('扫描中')) {
+                                malwareStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1 text-xs"></i> 发现异常!';
+                                malwareStatus.className = 'text-sm font-medium text-yellow-500 flex items-center';
+                            }
+                        },
+                        () => {
+                            if (phishingStatus.innerHTML.includes('扫描中')) {
+                                phishingStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1 text-xs"></i> 发现异常!';
+                                phishingStatus.className = 'text-sm font-medium text-yellow-500 flex items-center';
+                            }
+                        },
+                        () => {
+                            if (behaviorStatus.innerHTML.includes('扫描中')) {
+                                behaviorStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1 text-xs"></i> 发现异常!';
+                                behaviorStatus.className = 'text-sm font-medium text-yellow-500 flex items-center';
+                            }
+                        }
+                    ];
+                    
+                    // 随机选择一个状态变化执行
+                    if (Math.random() > 0.5) {
+                        statusChanges[Math.floor(Math.random() * statusChanges.length)]();
+                    }
+                }
+                
+                if (threatsCount === 1 && Math.random() < threatChance * 0.8) {
+                    threatsCount = 2;
+                    threatsDetected.textContent = threatsCount;
+                    
+                    // 随机选择高危威胁类型
+                    const highThreats = [
+                        '木马程序 Trojan.361.Generic',
+                        '勒索软件 Ransom.361.Prank',
+                        '远程控制工具 RAT.361.Remote',
+                        '数据窃取器 Stealer.361.Data',
+                        '挖矿程序 Miner.361.Coin'
+                    ];
+                    
+                    const randomHighThreat = highThreats[Math.floor(Math.random() * highThreats.length)];
+                    addLogEntry(`<div class="text-red-400">[!] 高危警告：发现${randomHighThreat}</div>`);
+                    
+                    // 立即将病毒状态标记为危险
+                    if (virusStatus.innerHTML.includes('扫描中')) {
+                        virusStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1 text-xs"></i> 发现威胁!';
+                        virusStatus.className = 'text-sm font-medium text-danger flex items-center';
+                    }
+                }
+                
+                // 更新扫描状态 - 增加随机性
+                const statusUpdateChance = 0.02; // 每次迭代有2%的概率更新一个状态
+                
+                if (malwareStatus.innerHTML.includes('扫描中') && (progress >= 15 + Math.random() * 15) && Math.random() < statusUpdateChance) {
+                    malwareStatus.innerHTML = '<i class="fa fa-check-circle mr-1 text-xs"></i> 已完成';
+                    malwareStatus.className = 'text-sm font-medium text-green-500 flex items-center';
+                    addLogEntry('<div class="text-green-400">[+] 恶意脚本检查完成</div>');
+                }
+                
+                if (phishingStatus.innerHTML.includes('扫描中') && (progress >= 30 + Math.random() * 15) && Math.random() < statusUpdateChance) {
+                    phishingStatus.innerHTML = '<i class="fa fa-check-circle mr-1 text-xs"></i> 已完成';
+                    phishingStatus.className = 'text-sm font-medium text-green-500 flex items-center';
+                    addLogEntry('<div class="text-green-400">[+] 钓鱼链接检查完成</div>');
+                }
+                
+                if (behaviorStatus.innerHTML.includes('扫描中') && (progress >= 50 + Math.random() * 15) && Math.random() < statusUpdateChance) {
+                    behaviorStatus.innerHTML = '<i class="fa fa-check-circle mr-1 text-xs"></i> 已完成';
+                    behaviorStatus.className = 'text-sm font-medium text-green-500 flex items-center';
+                    addLogEntry('<div class="text-green-400">[+] 异常行为检查完成</div>');
+                }
+                
+                if (leakStatus.innerHTML.includes('扫描中') && (progress >= 70 + Math.random() * 15) && Math.random() < statusUpdateChance) {
+                    leakStatus.innerHTML = '<i class="fa fa-check-circle mr-1 text-xs"></i> 已完成';
+                    leakStatus.className = 'text-sm font-medium text-green-500 flex items-center';
+                    addLogEntry('<div class="text-green-400">[+] 数据泄露检查完成</div>');
+                }
+                
+                if (virusStatus.innerHTML.includes('扫描中') && progress >= 85 && Math.random() < statusUpdateChance * 1.5) {
+                    // 如果已经发现了威胁，直接标记为危险
+                    if (threatsCount > 0) {
+                        virusStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1 text-xs"></i> 发现威胁!';
+                        virusStatus.className = 'text-sm font-medium text-danger flex items-center';
+                        addLogEntry('<div class="text-yellow-400">[*] 病毒特征检查发现异常</div>');
+                    } else {
+                        // 否则有50%概率正常完成，50%概率发现威胁
+                        if (Math.random() > 0.5) {
+                            virusStatus.innerHTML = '<i class="fa fa-check-circle mr-1 text-xs"></i> 已完成';
+                            virusStatus.className = 'text-sm font-medium text-green-500 flex items-center';
+                            addLogEntry('<div class="text-green-400">[+] 病毒特征检查完成</div>');
+                        } else {
+                            virusStatus.innerHTML = '<i class="fa fa-exclamation-triangle mr-1 text-xs"></i> 发现威胁!';
+                            virusStatus.className = 'text-sm font-medium text-danger flex items-center';
+                            addLogEntry('<div class="text-yellow-400">[*] 病毒特征检查发现异常</div>');
+                            
+                            // 强制添加一个威胁
+                            if (threatsCount === 0) {
+                                threatsCount = 1;
+                                threatsDetected.textContent = threatsCount;
+                                addLogEntry('<div class="text-red-400">[!] 高危警告：发现未知病毒变种 <span class="text-yellow-300">Virus.361.Unknown</span></div>');
+                            }
+                        }
+                    }
+                }
+                
+                // 添加随机日志
+                if (Math.random() > 0.8) {
+                    const randomLogs = [
+                        `<div class="text-blue-400">[*] 正在扫描文件: ${generateRandomFilename()}</div>`,
+                        `<div class="text-blue-400">[*] 检查网络连接: ${generateRandomIP()}</div>`,
+                        `<div class="text-blue-400">[*] 分析JavaScript代码片段...</div>`,
+                        `<div class="text-blue-400">[*] 检查Cookie安全性...</div>`,
+                        `<div class="text-blue-400">[*] 验证SSL证书...</div>`
+                    ];
+                    addLogEntry(randomLogs[Math.floor(Math.random() * randomLogs.length)]);
+                }
+                
+                // 更新网络图表
+                updateNetworkChart();
+                
+                // 扫描完成
+                if (progress >= 100) {
+                    clearInterval(scanInterval);
+                    scanStatus.textContent = '扫描完成';
+                    scanStatus.className = 'text-sm font-medium text-danger';
+                    addLogEntry('<div class="text-yellow-400">[*] 扫描完成，正在生成报告...</div>');
+                    
+                    // 延迟显示结果
+                    setTimeout(() => {
+                        showResults();
+                    }, 1000);
+                }
+            }, 300);
+        }
+        
+        // 添加日志条目
+        function addLogEntry(html) {
+            scanLog.innerHTML += html;
+            scanLog.scrollTop = scanLog.scrollHeight;
+        }
+        
+        // 生成随机文件名
+        function generateRandomFilename() {
+            const extensions = ['js', 'html', 'css', 'php', 'json'];
+            const prefixes = ['app', 'main', 'script', 'utils', 'config', 'data', 'api', 'vendor'];
+            const suffix = Math.floor(Math.random() * 1000);
+            const ext = extensions[Math.floor(Math.random() * extensions.length)];
+            const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+            return `${prefix}_${suffix}.${ext}`;
+        }
+        
+        // 生成随机IP
+        function generateRandomIP() {
+            return `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+        }
+        
+        // 更新网络图表
+        function updateNetworkChart() {
+            const bar = document.createElement('div');
+            const height = Math.floor(Math.random() * 80) + 20;
+            bar.className = 'absolute bottom-0 bg-primary opacity-70 transition-all duration-200';
+            bar.style.height = `${height}%`;
+            bar.style.width = '4px';
+            bar.style.right = '0';
+            
+            networkChart.appendChild(bar);
+            
+            // 移动所有条
+            const bars = networkChart.querySelectorAll('div');
+            bars.forEach((b, index) => {
+                b.style.right = `${(index + 1) * 8}px`;
+            });
+            
+            // 移除超出范围的条
+            if (bars.length > 30) {
+                networkChart.removeChild(bars[0]);
+            }
+        }
+        
+        // 显示扫描结果
+        function showResults() {
+            results.classList.remove('hidden');
+            
+            // 总是显示危险结果
+            dangerResult.classList.remove('hidden');
+            safeResult.classList.add('hidden');
+            
+            // 清空并添加威胁列表
+            threatList.innerHTML = '';
+            threats.forEach((threat, index) => {
+                const threatItem = document.createElement('div');
+                threatItem.className = 'flex items-center justify-between bg-red-50 p-3 rounded-lg mb-3 border border-red-100 shadow-sm';
+                threatItem.innerHTML = `
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                            <i class="fa fa-${index === 0 ? 'bug' : 'code'} text-red-500"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-red-800">${threat.name}</h4>
+                            <p class="text-xs text-red-600">${threat.type} | 发现于: ${generateRandomFilename()}</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-xs font-medium px-2 py-1 rounded ${threat.severity === '高' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'} mb-1">${threat.severity}</span>
+                        <button class="text-xs text-primary hover:text-blue-700 flex items-center">
+                            <i class="fa fa-info-circle mr-1"></i> 详情
+                        </button>
+                    </div>
+                `;
+                threatList.appendChild(threatItem);
+            });
+            
+            // 添加扫描统计
+            const statsContainer = document.createElement('div');
+            statsContainer.className = 'grid grid-cols-3 gap-4 mt-6';
+            statsContainer.innerHTML = `
+                <div class="bg-gray-50 p-3 rounded-lg text-center">
+                    <p class="text-xs text-gray-500 mb-1">扫描文件</p>
+                    <p class="text-lg font-bold text-gray-800">${Math.floor(Math.random() * 1000) + 500}</p>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-lg text-center">
+                    <p class="text-xs text-gray-500 mb-1">发现威胁</p>
+                    <p class="text-lg font-bold text-danger">${threats.length}</p>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-lg text-center">
+                    <p class="text-xs text-gray-500 mb-1">扫描时间</p>
+                    <p class="text-lg font-bold text-blue-600">${Math.floor(Math.random() * 10) + 5}秒</p>
+                </div>
+            `;
+            dangerResult.querySelector('.ml-4').appendChild(statsContainer);
+            
+            // 添加操作按钮
+            const actionsContainer = document.createElement('div');
+            actionsContainer.className = 'flex space-x-3 mt-6';
+            actionsContainer.innerHTML = `
+                <button class="flex-1 bg-danger hover:bg-red-600 text-white text-sm font-medium py-2 px-4 rounded-lg transition-all flex items-center justify-center">
+                    <i class="fa fa-shield mr-2"></i> 立即处理
+                </button>
+                <button class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium py-2 px-4 rounded-lg transition-all flex items-center justify-center">
+                    <i class="fa fa-download mr-2"></i> 导出报告
+                </button>
+            `;
+            dangerResult.querySelector('.ml-4').appendChild(actionsContainer);
+            
+            // 延迟显示病毒警告
+            setTimeout(() => {
+                showVirusWarning();
+            }, 2000);
+        }
+        
+        // 显示病毒警告
+        function showVirusWarning() {
+            // 先显示正常的扫描完成弹窗
+            const warningTitle = virusWarning.querySelector('h2');
+            const originalTitle = warningTitle.textContent;
+            const warningMessage = virusWarning.querySelector('p');
+            const originalMessage = warningMessage.textContent;
+            
+            // 临时修改为扫描完成信息
+            warningTitle.textContent = '扫描完成';
+            warningTitle.className = 'text-2xl font-bold text-center text-primary mb-2';
+            warningMessage.textContent = '正在生成扫描报告，请稍候...';
+            
+            // 显示弹窗
+            virusWarning.classList.remove('hidden');
+            
+            // 停顿2秒后显示真实的病毒警告
+            setTimeout(() => {
+                // 恢复原始的警告信息
+                warningTitle.textContent = originalTitle;
+                warningTitle.className = 'text-2xl font-bold text-center text-danger mb-2 animate-pulse-fast';
+                warningMessage.textContent = originalMessage;
+                
+                // 添加震动效果
+                virusWarning.querySelector('.bg-white').classList.add('animate-shake');
+                setTimeout(() => {
+                    virusWarning.querySelector('.bg-white').classList.remove('animate-shake');
+                }, 500);
+                
+                // 开始维持进度条
+                maintainInterval = setInterval(() => {
+                    maintainProgress -= 1.5; // 减慢进度条下降速度，增加紧张感
+                    maintainProgressBar.style.width = `${maintainProgress}%`;
+                    maintainStatus.textContent = `维持中... ${Math.round(maintainProgress)}%`;
+                    
+                    // 随机添加系统波动效果
+                    if (Math.random() > 0.8) {
+                        virusWarning.querySelector('.bg-white').classList.add('animate-shake');
+                        setTimeout(() => {
+                            virusWarning.querySelector('.bg-white').classList.remove('animate-shake');
+                        }, 200);
+                    }
+                    
+                    if (maintainProgress <= 0) {
+                        clearInterval(maintainInterval);
+                        maintainStatus.textContent = '维持失败！';
+                        
+                        // 添加最终的震动效果
+                        virusWarning.querySelector('.bg-white').classList.add('animate-shake');
+                        
+                        // 显示感染屏幕
+                        setTimeout(() => {
+                            virusWarning.classList.add('hidden');
+                            showInfectedScreen();
+                        }, 1000);
+                    }
+                }, 200);
+            }, 2000); // 停顿2秒
+        }
+        
+        // 显示感染屏幕
+        function showInfectedScreen() {
+            infected = true;
+            infectedScreen.classList.remove('hidden');
+            noise.classList.add('active');
+            app.classList.add('hidden');
+            
+            // 添加扫描线效果
+            infectedScreen.classList.add('bg-scan');
+            
+            // 设置当前时间为感染时间
+            const now = new Date();
+            const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            infectionTime.textContent = formattedDate;
+            
+            // 随机生成受影响文件数量
+            const fileCount = Math.floor(Math.random() * 2000) + 500;
+            affectedFiles.textContent = fileCount.toLocaleString();
+            
+            // 开始生成动态病毒粒子
+            startVirusParticles();
+            
+            // 开始终端日志更新
+            startTerminalLog();
+            
+            // 开始倒计时
+            startCountdown();
+            
+            // 开始鼠标轨迹效果
+            startCursorTrail();
+            
+            // 模拟系统故障
+            simulateSystemFailure();
+        }
+        
+        // 开始生成动态病毒粒子
+        function startVirusParticles() {
+            setInterval(() => {
+                if (Math.random() > 0.3) { // 增加粒子生成频率
+                    createVirusParticle();
+                }
+            }, 200);
+        }
+        
+        // 创建病毒粒子
+        function createVirusParticle() {
+            const particle = document.createElement('div');
+            particle.className = 'virus-particle';
+            
+            // 随机位置
+            const x = Math.random() * window.innerWidth;
+            const y = Math.random() * window.innerHeight;
+            
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            
+            virusParticlesContainer.appendChild(particle);
+            
+            // 显示动画
+            setTimeout(() => {
+                particle.style.opacity = '1';
+                particle.style.transition = 'opacity 0.3s ease-in-out';
+                
+                // 移动动画
+                setTimeout(() => {
+                    const targetX = x + (Math.random() - 0.5) * 200; // 增加移动距离
+                    const targetY = y + (Math.random() - 0.5) * 200;
+                    
+                    particle.style.left = `${targetX}px`;
+                    particle.style.top = `${targetY}px`;
+                    particle.style.transition = 'all 2s ease-in-out';
+                    
+                    // 淡出效果
+                    setTimeout(() => {
+                        particle.style.opacity = '0';
+                        
+                        // 移除元素
+                        setTimeout(() => {
+                            if (virusParticlesContainer.contains(particle)) {
+                                virusParticlesContainer.removeChild(particle);
+                            }
+                        }, 300);
+                    }, 1500);
+                }, 300);
+            }, 10);
+        }
+        
+        // 开始终端日志更新
+        function startTerminalLog() {
+            const terminalMessages = [
+                '[*] 正在扫描系统漏洞...',
+                '[*] 发现管理员账户，正在获取权限...',
+                '[+] 已获取系统管理员权限',
+                '[*] 正在禁用安全软件...',
+                '[+] Windows Defender 已禁用',
+                '[+] 防火墙已关闭',
+                '[*] 正在下载恶意程序...',
+                '[+] 勒索软件已安装',
+                '[*] 正在扫描重要文件...',
+                '[*] 发现文档、照片和财务文件',
+                '[*] 开始加密文件...',
+                '[*] 已加密 10% 的文件',
+                '[*] 已加密 35% 的文件',
+                '[*] 已加密 67% 的文件',
+                '[+] 文件加密完成',
+                '[*] 创建勒索通知...',
+                '[*] 建立远程连接...',
+                '[+] 后门已安装',
+                '[*] 清除入侵痕迹...',
+                '[+] 任务完成，等待用户联系'
+            ];
+            
+            let messageIndex = 0;
+            
+            // 先显示初始消息
+            setTimeout(() => {
+                const logInterval = setInterval(() => {
+                    if (messageIndex < terminalMessages.length) {
+                        const message = document.createElement('div');
+                        message.textContent = terminalMessages[messageIndex];
+                        
+                        // 随机添加不同颜色
+                        if (message.textContent.includes('[!]')) {
+                            message.className = 'text-yellow-400';
+                        } else if (message.textContent.includes('[+]')) {
+                            message.className = 'text-green-400';
+                        } else if (message.textContent.includes('[*]')) {
+                            message.className = 'text-blue-400';
+                        }
+                        
+                        terminalLog.appendChild(message);
+                        terminalLog.scrollTop = terminalLog.scrollHeight;
+                        messageIndex++;
+                    } else {
+                        clearInterval(logInterval);
+                    }
+                }, 1000); // 每秒显示一条消息
+            }, 2000); // 等待2秒后开始显示
+        }
+        
+        // 开始倒计时
+        function startCountdown() {
+            updateCountdownDisplay();
+            
+            countdownInterval = setInterval(() => {
+                countdownTime--;
+                
+                if (countdownTime <= 0) {
+                    clearInterval(countdownInterval);
+                    countdown.textContent = '00:00';
+                    // 这里可以添加更多恶作剧效果
+                } else {
+                    updateCountdownDisplay();
+                }
+            }, 1000);
+        }
+        
+        // 更新倒计时显示
+        function updateCountdownDisplay() {
+            const minutes = Math.floor(countdownTime / 60).toString().padStart(2, '0');
+            const seconds = (countdownTime % 60).toString().padStart(2, '0');
+            countdown.textContent = `${minutes}:${seconds}`;
+        }
+        
+        // 创建鼠标轨迹
+        function createCursorTrail(x, y) {
+            const trail = document.createElement('div');
+            trail.className = 'cursor-trail';
+            trail.style.left = `${x}px`;
+            trail.style.top = `${y}px`;
+            
+            document.body.appendChild(trail);
+            
+            // 淡出效果
+            setTimeout(() => {
+                trail.style.opacity = '0';
+                trail.style.transition = 'opacity 0.5s ease-in-out';
+                
+                // 移除元素
+                setTimeout(() => {
+                    document.body.removeChild(trail);
+                }, 500);
+            }, 100);
+        }
+        
+        // 开始鼠标轨迹效果
+        function startCursorTrail() {
+            // 随机生成病毒粒子
+            setInterval(() => {
+                if (Math.random() > 0.7) {
+                    createVirusParticle();
+                }
+            }, 500);
+        }
+        
+        // 创建病毒粒子
+        function createVirusParticle() {
+            const particle = document.createElement('div');
+            particle.className = 'virus-particle';
+            
+            // 随机位置
+            const x = Math.random() * window.innerWidth;
+            const y = Math.random() * window.innerHeight;
+            
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            
+            document.body.appendChild(particle);
+            
+            // 显示动画
+            setTimeout(() => {
+                particle.style.opacity = '1';
+                particle.style.transition = 'opacity 0.3s ease-in-out';
+                
+                // 移动动画
+                setTimeout(() => {
+                    const targetX = x + (Math.random() - 0.5) * 100;
+                    const targetY = y + (Math.random() - 0.5) * 100;
+                    
+                    particle.style.left = `${targetX}px`;
+                    particle.style.top = `${targetY}px`;
+                    particle.style.transition = 'all 1s ease-in-out';
+                    
+                    // 淡出效果
+                    setTimeout(() => {
+                        particle.style.opacity = '0';
+                        
+                        // 移除元素
+                        setTimeout(() => {
+                            document.body.removeChild(particle);
+                        }, 300);
+                    }, 1000);
+                }, 300);
+            }, 10);
+        }
+        
+        // 模拟系统故障
+        function simulateSystemFailure() {
+            // 随机时间执行故障效果
+            setTimeout(() => {
+                // 屏幕闪烁
+                blinkScreen();
+                
+                // 随机故障
+                setInterval(() => {
+                    if (Math.random() > 0.8) {
+                        // 随机选择一种故障效果
+                        const effects = [
+                            blinkScreen,
+                            shakeScreen,
+                            glitchScreen
+                        ];
+                        
+                        const randomEffect = effects[Math.floor(Math.random() * effects.length)];
+                        randomEffect();
+                    }
+                }, 2000);
+            }, 5000);
+        }
+        
+        // 屏幕闪烁
+        function blinkScreen() {
+            document.body.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+            
+            setTimeout(() => {
+                document.body.style.backgroundColor = '';
+                document.body.style.transition = 'background-color 0.1s ease-in-out';
+            }, 100);
+        }
+        
+        // 屏幕震动
+        function shakeScreen() {
+            infectedScreen.classList.add('animate-shake');
+            
+            setTimeout(() => {
+                infectedScreen.classList.remove('animate-shake');
+            }, 500);
+        }
+        
+        // 屏幕故障
+        function glitchScreen() {
+            infectedScreen.classList.add('animate-glitch');
+            
+            setTimeout(() => {
+                infectedScreen.classList.remove('animate-glitch');
+            }, 300);
+        }
+    </script>
+</body>
+</html>
